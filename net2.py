@@ -51,31 +51,33 @@ class net2(nn.Module):
         hidden_states = torch.stack(hidden_state, dim=0)
     return outputs, hidden_states
   
-  def train_model(self, dataset, num_epochs, lr):
-      optimizer = optim.Adam(self.parameters(), lr=lr)
-      criterion = nn.CrossEntropyLoss()
+  def train_model(self, dataset, num_epochs, lr, device='cpu'):
+    self = self.to(device)
+    optimizer = optim.Adam(self.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
 
-      running_loss = 0
-      running_acc = 0
-      start_time = time.time()
-      print('Training network...')
-      for i in range(num_epochs):
-          inputs, labels = dataset()
-          inputs = torch.from_numpy(inputs).type(torch.float)
-          labels = torch.from_numpy(labels.flatten()).type(torch.long)
+    running_loss = 0
+    running_acc = 0
+    start_time = time.time()
+    print('Training network...')
+    for i in range(num_epochs):
+        inputs, labels = dataset()
+        inputs = torch.from_numpy(inputs).type(torch.float).to(device)
+        labels = torch.from_numpy(labels.flatten()).type(torch.long).to(device) 
 
-          optimizer.zero_grad()
-          output, _ = self(inputs)
-          #output = output.view(-1, output_size)
-          loss = criterion(output.view(-1, self.bO.size(0)), labels)
-          loss.backward()
-          optimizer.step()
+        optimizer.zero_grad()
+        output, _ = self(inputs)
+        #output = output.view(-1, output_size)
+        loss = criterion(output.view(-1, self.bO.size(0)), labels)
+        loss.backward()
+        optimizer.step()
 
-          running_loss += loss.item()
-          if i % 100 == 99:
-              running_loss /= 100
-              print('Step {}, Loss {:0.4f}, Time {:0.1f}s'.format(
-                  i+1, running_loss, time.time() - start_time))
-              running_loss = 0
-      return self
+        running_loss += loss.item()
+        if i % 100 == 99:
+            running_loss /= 100
+            print('Step {}, Loss {:0.4f}, Time {:0.1f}s'.format(
+                i+1, running_loss, time.time() - start_time))
+            running_loss = 0
+    self = self.to('cpu')
+    return self
   

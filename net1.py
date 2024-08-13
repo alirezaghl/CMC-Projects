@@ -28,9 +28,9 @@ class CTRNN(nn.Module):
         self.h2h = nn.Linear(hidden_size, hidden_size)
         #nn.init.kaiming_normal_(self.h2h.weight)
 
-    def init_hidden(self, input_shape):
-        batch_size = input_shape[1]
-        return torch.zeros(batch_size, self.hidden_size)
+    def init_hidden(self, input):
+        batch_size = input.shape[1]
+        return torch.zeros(batch_size, self.hidden_size).to(input.device)
 
     def recurrence(self, input, hidden):
         h_new = torch.relu(self.input2h(input) + self.h2h(hidden))
@@ -39,7 +39,7 @@ class CTRNN(nn.Module):
 
     def forward(self, input, hidden=None):
         if hidden is None:
-            hidden = self.init_hidden(input.shape)
+            hidden = self.init_hidden(input)
 
         output = []
         steps = range(input.size(0))
@@ -64,30 +64,32 @@ class net1(nn.Module):
         out = self.fc(rnn_output)
         return out, rnn_output
     
-    def train_model(self, dataset, num_epochs, lr):
-      optimizer = optim.Adam(self.parameters(), lr=lr)
-      criterion = nn.CrossEntropyLoss()
+    def train_model(self, dataset, num_epochs, lr, device='cpu'):
+        self = self.to(device)
+        optimizer = optim.Adam(self.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
 
-      running_loss = 0
-      running_acc = 0
-      start_time = time.time()
-      print('Training network...')
-      for i in range(num_epochs):
-          inputs, labels = dataset()
-          inputs = torch.from_numpy(inputs).type(torch.float)
-          labels = torch.from_numpy(labels.flatten()).type(torch.long)
+        running_loss = 0
+        running_acc = 0
+        start_time = time.time()
+        print('Training network...')
+        for i in range(num_epochs):
+            inputs, labels = dataset()
+            inputs = torch.from_numpy(inputs).type(torch.float).to(device)
+            labels = torch.from_numpy(labels.flatten()).type(torch.long).to(device)
 
-          optimizer.zero_grad()
-          output, _ = self(inputs)
-          #output = output.view(-1, output_size)
-          loss = criterion(output.view(-1, self.fc.out_features), labels)
-          loss.backward()
-          optimizer.step()
+            optimizer.zero_grad()
+            output, _ = self(inputs)
+            #output = output.view(-1, output_size)
+            loss = criterion(output.view(-1, self.fc.out_features), labels)
+            loss.backward()
+            optimizer.step()
 
-          running_loss += loss.item()
-          if i % 100 == 99:
-              running_loss /= 100
-              print('Step {}, Loss {:0.4f}, Time {:0.1f}s'.format(
-                  i+1, running_loss, time.time() - start_time))
-              running_loss = 0
-      return self
+            running_loss += loss.item()
+            if i % 100 == 99:
+                running_loss /= 100
+                print('Step {}, Loss {:0.4f}, Time {:0.1f}s'.format(
+                    i+1, running_loss, time.time() - start_time))
+                running_loss = 0
+        self = self.to('cpu')
+        return self
